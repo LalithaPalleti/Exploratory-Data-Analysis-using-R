@@ -1,0 +1,763 @@
+Propser Loan Data Exploratory Analysis by Sai Sri Lalitha Sravanthi Palleti
+============================================================================
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+
+library(ggplot2)
+library(GGally)
+library(scales)
+library(memisc)
+library(gridExtra)
+library(RColorBrewer)
+library(RCurl)
+library(bitops)
+library(dplyr)
+library(psych)
+
+library(Hmisc)
+
+library(aod)
+
+library(plotly)
+library(reshape2)
+
+```
+
+```{r echo=FALSE, Load_the_Data}
+# Load the Data
+getwd()
+LoanData<- read.csv(file = 'prosperLoanData.csv')
+
+```
+
+# Introduction: 
+
+Prosper is the first peer-to-peer lending marketplace in the United States.Through 
+Prosper, people can invest in each other in a way that is financially and socially 
+rewarding.Prosper handles all loan servicing on behalf of the matched borrowers 
+
+and investors.I would like to analyze the loan data of and provide insights that 
+
+help understand relationships between different variables in the loan data
+
+
+# Univariate Plots Section
+
+
+```{r echo=FALSE, Univariate_Plots}
+
+#Data Type Conversions:
+
+# Changing 'Loan Origination Date' from Factor type to Date type using as.Date
+LoanData$LoanOriginationDate<- as.Date(LoanData$LoanOriginationDate, format = "%Y-%m-%d")
+
+# Changing 'Closed Date' from Factor type to Date type using as.Date
+LoanData$ClosedDate<- as.Date(LoanData$ClosedDate, format = "%Y-%m-%d")
+
+#Subsetting the data:
+
+required_data <- select(LoanData,Term,LoanStatus,BorrowerAPR,BorrowerRate,EmploymentStatus,IncomeRange,TotalProsperLoans,LoanOriginationDate,IsBorrowerHomeowner,CreditScoreRangeLower,CreditScoreRangeUpper,Investors,LoanOriginalAmount,BankcardUtilization,DebtToIncomeRatio,StatedMonthlyIncome,Occupation,Recommendations)
+
+# new column 'Listing Category' created
+required_data$ListingCategory<- case_when(
+LoanData$ListingCategory..numeric.== 0 ~ "Not Available",                        LoanData$ListingCategory..numeric.==1 ~ "Debt Consolidation",
+LoanData$ListingCategory..numeric.==2 ~ "Home Improvement", 
+LoanData$ListingCategory..numeric.==3 ~ "Business",
+LoanData$ListingCategory..numeric.==4 ~ "Personal Loan",
+LoanData$ListingCategory..numeric.==5 ~ "Student Use", 
+LoanData$ListingCategory..numeric.==6 ~ "Auto",
+LoanData$ListingCategory..numeric.==7~ "Other",
+LoanData$ListingCategory..numeric.==8 ~ "Baby&Adoption",
+LoanData$ListingCategory..numeric.==9 ~ "Boat", 
+LoanData$ListingCategory..numeric.==10 ~ "Cosmetic Procedure",
+LoanData$ListingCategory..numeric.==11 ~ "Engagement Ring", 
+LoanData$ListingCategory..numeric.==12 ~ "Green Loans", 
+LoanData$ListingCategory..numeric.==13 ~ "Household Expenses",
+LoanData$ListingCategory..numeric.==14 ~ "Large Purchases",
+LoanData$ListingCategory..numeric.==15 ~ "Medical/Dental", 
+LoanData$ListingCategory..numeric.==16 ~ "Motorcycle",
+LoanData$ListingCategory..numeric.==17 ~ "RV", 
+LoanData$ListingCategory..numeric.==18 ~ "Taxes",
+LoanData$ListingCategory..numeric.==19 ~ "Vacation", 
+LoanData$ListingCategory..numeric.==20 ~ "Wedding Loans")
+
+#Creating a new column - Delinquent Borrowers
+required_data$DelinquentBorrowers <- ifelse(                                      required_data$LoanStatus == "Defaulted" |
+required_data$LoanStatus == "Chargedoff" |
+required_data$LoanStatus == "Past Due (61-90 days)" |
+required_data$LoanStatus == "Past Due (91-120 days)" |
+required_data$LoanStatus == "Past Due (>120 days)",                              1, 0)
+
+#Changing Delinquent Borrowers to factor variable 
+required_data$DelinquentBorrowers <- factor(required_data$DelinquentBorrowers, labels= c("Good Standing","Delinquent"))
+
+#Extracted year from Loan Origination Date
+required_data$LoanOriginatedYear<-format(required_data$LoanOriginationDate,"%Y")
+
+#type casting  'Term' from Integer to Factor Variable
+required_data$Term <- factor(required_data$Term)
+ 
+
+```
+
+```{r echo=FALSE}
+ggplot(aes(x= DelinquentBorrowers),data = required_data) +
+  geom_histogram(stat = "count")+
+  ggtitle('Delinquent Borrowers')
+
+```
+
+
+
+```{r echo=FALSE}
+ggplot(aes(x= LoanOriginatedYear),data = required_data) +
+  geom_histogram(stat = "count")+
+  ggtitle('Loan Originated Year')
+
+```
+
+From the above plot more Loan are originated in 2013.Also there is a negative skewed distribution from year 2009 to 2013. I want to further investigate factors such as term of loan,Income Status, Occupation, Listing Category of the borrower
+
+```{r echo=FALSE}
+
+ggplot(aes(x= Term),data = required_data) +
+  geom_histogram(stat = "count",binwidth = 1)+
+  ggtitle('Term')
+
+```
+
+From the above plot I have learned that most loans are 36 month period .Lets see teh plot of Loan Amount
+
+```{r echo=FALSE}
+ggplot(aes(x= LoanOriginalAmount),data = required_data) +
+  #geom_histogram(aes(fill = DelinquentBorrowers),binwidth = 500)+
+  geom_histogram(binwidth = 500)+
+  xlim(0,15000)+
+  ggtitle('Loan Amount')
+
+```
+
+Loan Amount has high peak around 3000$ - 4000$.Lets see for which loan category are they taking this amount to get more clarity around here
+
+```{r echo=FALSE}
+ggplot(aes(x=ListingCategory),data = required_data) +
+  geom_bar(width = 0.3)+
+  ggtitle('Loan Category')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+```
+Debt Consolidation has the highest majority.Lets see the Income range of borrowers to investigate the Reason for debt
+
+```{r echo=FALSE}
+ggplot(aes(x= IncomeRange),data = required_data) +
+  geom_bar(width = 0.1)+
+  ggtitle('Income range of the borrower')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+The above plot shows that the borrowers are more in the Income Range 25,000 - 49,999$ ,lets also see teh employment status to see if all debt consolidations are coming from employed borrowers or not
+
+```{r echo=FALSE}
+ggplot(aes(x=EmploymentStatus),data = required_data)+
+  geom_histogram(stat = "count", binwidth = 0.001)+
+  ggtitle('Employment Status')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+Surprisingly there are more number of borrowers who are employed.Lets also see the Bank Card Utilization to understand the reason for Debt of employed borrowers
+
+```{r echo=FALSE}
+
+ggplot(aes(x= BankcardUtilization),data = required_data) +
+  geom_histogram(binwidth = 0.01)+
+  ggtitle('Bank card Utilization')+
+  xlim(0,4)
+  
+
+```
+
+Above plot shows a negative skewed distribution,borrowers bank card utilization has increased gradually from  0% to 1% Bank card Utilization.Lets see at what rate the borrower is paying his interest , to see if high interest rate might have been a reason for high bank card utilization and therefore lead to delinquency
+
+```{r echo=FALSE}
+
+ggplot(aes(x= BorrowerAPR),data = required_data) +
+  geom_histogram(binwidth = 0.009)+
+  ggtitle('Borrowers Annual Percentage Rate')
+
+```
+
+Seems like most borrower's Annual Percentage Rate is 3.6% or 3.7% 
+That does not see like a high rate .Lets see the interest rate for the loan
+
+```{r echo=FALSE}
+ggplot(aes(x= BorrowerRate),data = required_data) +
+  geom_histogram(binwidth = 0.01)+
+  ggtitle('Borower Interest Rate')
+```
+
+Interest rate 1.5% has high frequency.From the above plot am assuming delinquencies are higher at 1.5% Interest rate.Lets also see the plot of Credit Score
+
+
+```{r echo=FALSE}
+
+summary(required_data$BorrowerRate)
+
+
+```
+
+```{r echo=FALSE}
+
+ggplot(aes(x= CreditScoreRangeLower),data = required_data) +
+  geom_histogram(binwidth = 10)+
+  ggtitle('Credit Score Range Lower')
+
+
+
+```
+
+Credit score lower Range plot shows a normal distribution from creditscore 500 to 800.Before considering this a factor for delinquency , lets also see the plot of Upper range of Credit Score
+
+```{r echo=FALSE}
+
+summary(required_data$CreditScoreRangeLower)
+
+```
+
+```{r echo=FALSE}
+
+
+ggplot(aes(x= CreditScoreRangeUpper),data = required_data) +
+  geom_histogram(binwidth = 10)+
+  ggtitle('Credit Score Range Upper')
+
+
+```
+
+Upper range of credit Score also has the same distribution as Lower range of credit Score. The highest peak is between 650 and 750. So am assuming delinquencies will be higher at this range of Credit score .Lets see the actual results in Bivariate plots
+
+```{r echo=FALSE}
+summary(required_data$CreditScoreRangeUpper)
+
+```
+
+# Univariate Analysis
+
+### What is the structure of your dataset?
+
+There are 113937 observations in the  Loan dataset with 81 features. I have subsetted the data and taken only 24 variables for analysis
+
+### What is/are the main feature(s) of interest in your dataset?
+
+After reviewing the long list of variables, and thinking of all of the different paths of investigation, I've decided to narrow my focus of investigation around deliquencies and their correlations
+
+The main features for this exploration are: 
+- Term: The length of the loan expressed in months
+- Loan Status: Current Status of the Loan 
+  - Cancelled
+  - Charged off
+  - Completed
+  - Defaulted
+  - FinalPaymentInProgress
+  - Past Due
+
+- Borrower State: The two letter abbreviation of the state of the address of the                    borrower at the time the Listing was created.
+- Listing Category: The category of the listing that the borrower selected when                       posting their listing
+    0 - Not Available
+    1 - Debt Consolidation
+    2 - Home Improvement
+    3 - Business
+    4 - Personal Loan
+    5 - Student Use
+    6 - Auto
+    7- Other
+    8 - Baby&Adoption
+    9 - Boat
+    10 - Cosmetic Procedure
+    11 - Engagement Ring
+    12 - Green Loans
+    13 - Household Expenses
+    14 - Large Purchases
+    15 - Medical/Dental
+    16 - Motorcycle
+    17 - RV
+    18 - Taxes
+    19 - Vacation
+    20 - Wedding Loans
+    
+- Credit Score Range Lower: The lower value representing the range of the                                     borrower's credit score as provided by a consumer                                 credit rating agency
+- Credit Score Range Upper: The upper value representing the range of the                                     borrower's credit score as provided by a consumer                                 credit rating agency 
+- Bankcard Utilization: The percentage of available revolving credit that is                              utilized at the time the credit profile was pulled
+- Income Range: The income range of the borrower at the time the listing was                      created
+- Loan Original Amount: The origination amount of the loan
+- Investors: The number of investors that funded the loan
+
+### What other features in the dataset do you think will help support your \
+investigation into your feature(s) of interest?
+
+These features help to contribute to deeper dives and identification of possible trends:
+- Listing Creation Date: The date the listing was created
+- Occupation: The Occupation selected by the Borrower at the time they created the               listing
+- IsBorrowerHomeOwner: A Borrower will be classified as a homowner if they have a                        mortgage on their credit profile or provide documentation                         confirming they are a homeowner
+- BorrowerAPR: The Borrower's Annual Percentage Rate (APR) for the loan
+- BorrowerRate: The Borrower's interest rate for this loan
+- Recommendations: Number of recommendations the borrower had at the time the                        listing was created
+- TotalProsperLoans: Number of Prosper loans the borrower at the time they created                      this listing. This value will be null if the borrower had no                      prior loans
+- DebttoIncomeRatio: The debt to income ratio of the borrower at the time the                          credit profile was pulled
+- StatedMonthlyIncome: The monthly income the borrower stated at the time the                            listing was created
+
+### Did you create any new variables from existing variables in the dataset?
+
+Yes,I have created three new variables:
+- Listing Category from Listing Category Numeric
+- LoanOriginatedYear from LoanOriginatedDate 
+- Delinquent Borrowers from Loan Status
+
+
+### Of the features you investigated, were there any unusual distributions? \
+Did you perform any operations on the data to tidy, adjust, or change the form \
+of the data? If so, why did you do this?
+
+I have performed data type conversions on date columns in the data to apply date functions such as extracting days, months or years on the data
+
+
+# Bivariate Plots Section
+
+```{r echo=FALSE}
+
+ggcorr(required_data, label = TRUE, label_size = 3,
+       hjust = 0.8, size = 2.5, color = "black", layout.exp = 2)
+
+
+
+```
+
+From the above corelation graph ,Borrower APR and Borrower Rate ,Credit Range Upper and Credit range Lower seems to be strongly correlated where as Investors and LoanAmount, Upper/lower Credit Range and Investors, Loan Amount ,Borrower Rate,Stated Monthly Income are moderately positively related related
+Borrower's Interest rate and Credit score are moderately negatively related wih -0.5 correlation
+
+I want to look closer at scatter plots involving Delinquent Borrowers and some other variables like Loan Amount, Loan Originated Year,Listing category,Debtto IncomeRatio,Bank CardUtilization,Loan Status
+
+```{r echo=FALSE, Bivariate_Plots}
+#Loan Originated Year and Delinquency
+ggplot(aes(x= LoanOriginatedYear),data = required_data) +
+  geom_bar(aes(fill = DelinquentBorrowers))+
+  ggtitle('Loan Originated Year and Delinquency')
+
+```
+
+Surprisingly, from the above plot more delinquencies happened in 2007, 2008 .I expected more delinquencies in 2013 , as it has the highest loans originated.May be 2007 an d2008 are the financial crisis years. I want to further investigate like in what factors led to delinquncy such as term of loan, Income Status, Occupation, Listing Category of the borrower
+
+```{r echo=FALSE}
+ggplot(aes(x= Term),data = required_data) +
+  geom_bar(aes(fill = DelinquentBorrowers))+
+  ggtitle('Term and Delinquency Status')
+```
+
+As expected ,From the above plot delinquencies are high in the 36 month term.Lets see the loan amount range 
+
+```{r echo=FALSE}
+ggplot(aes(x= LoanOriginalAmount),data = required_data) +
+  geom_histogram(aes(fill = DelinquentBorrowers),binwidth = 500)+
+  ggtitle('Original Loan Amount and Delinquency')
+```
+
+Loan Amount has high peak around 4000$ and also most delinqunecies for that loan amount.Lets see for which loan category are they taking this amount to get more clarity around here
+
+```{r echo=FALSE}
+ggplot(aes(x=ListingCategory),data = required_data) +
+  geom_bar(width = 0.3, aes(fill = DelinquentBorrowers))+
+  ggtitle('Loan Category and Delinquency')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+Surprisingly , NOt available lOan Category has highets delinquency than Debt Consolidation.Here we did not get any clue for Delinquency rate.Lets see Income range of borrowers
+
+```{r echo=FALSE}
+ggplot(aes(x= IncomeRange),data = required_data) +
+  geom_bar(width = 0.5,aes(fill = DelinquentBorrowers))+
+  ggtitle('Income range of the borrower and Delinquency')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+The above plot shows that the borrowers are more in the Income Range 25,000 - 49,999$ and delinquency is also high in this range, lets also see the employment status to see if all delinquencies are coming from employed borrowers or not
+
+```{r echo=FALSE}
+ggplot(aes(x=EmploymentStatus),data = required_data)+
+  geom_bar(aes(fill = DelinquentBorrowers))+
+  ggtitle('Employment Status and Delinquency')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+Surprisingly there are more number of borrowers who are employed, and the delinquent borrowers are more in number from full time employed.Lets also see the occupation to see which full field full time employees are more delinquent 
+
+```{r echo=FALSE}
+ggplot(aes(x= BankcardUtilization),data = required_data) +
+  geom_histogram(aes(fill = DelinquentBorrowers),binwidth = 0.4)+
+  ggtitle('Bank card Utilization and Delinquency')+
+  xlim(0,4)
+  
+
+```
+
+We know from Univariate plot that Bank card utilization has negative skew distribution from 0% to 1% ,here it seems like borrowers who have 0.5% to 1% Bank card Utilization tend to be more Delinquent borrowers.Lets see at what rate the borrower is paying his interest , to see if high interest rate might have been a reason for high bank card utilization and therefore lead to delinquency
+
+```{r echo=FALSE}
+ggplot(aes(x= BorrowerAPR),data = required_data) +
+  geom_histogram(binwidth = 0.009,aes(fill=DelinquentBorrowers))+
+  ggtitle('Borrowers Annual Percentage Rate and Delinquency')
+
+```
+
+Seems like most borrower's Annual Percentage Rate is 3.6% or 3.7% 
+That does not see like a high rate .Lets see the interst rate for the loan
+
+```{r echo=FALSE}
+ggplot(aes(x= BorrowerRate),data = required_data) +
+  geom_histogram(binwidth = 0.01, aes(fill=DelinquentBorrowers))+
+  ggtitle('Borower Interest Rate and Delinquency')
+
+```
+
+Interest rate 1.5% has high frequency , but delinquency is higher at 2.8% and 3.3%
+The Interest rate less than 1% has less delinquency and as the interest rate increases , delinquency also increased from 0.6% to 3.5% and also some delinquencies at 4% ,4.5% and 5% Interest rates. High Interest rates are definitely a factor for Delinquency here
+
+```{r echo=FALSE}
+ggplot(aes(x= CreditScoreRangeLower),data = required_data) +
+  geom_bar(aes(fill= DelinquentBorrowers))+
+  ggtitle('Credit Score Range Lower and Delinquency')
+
+```
+
+
+
+```{r echo=FALSE}
+ggplot(aes(x= CreditScoreRangeUpper),data = required_data) +
+  geom_bar(aes(fill= DelinquentBorrowers))+
+  ggtitle('Credit Score Range Upper and Delinquency')+
+  xlim(400,750)
+
+```
+
+we know from univariate plots that Credit score has normal distribution in the range 500-700 and highest credt score in the range 650 - 700,the delinquencies are
+high in the same range, this is expected.Lets also see the relations between these factors Loan year and LOanAmount, Loan Category and Loan amount and Term Loan Amount, MOnthly Income, Bank Card Utilizaion , Debt to Income Ratio, Interest rate ,credit score and Investors
+
+```{r echo=FALSE}
+
+ggplot(aes(x = LoanOriginatedYear, y = LoanOriginalAmount ), data = required_data)+
+  geom_boxplot(aes(fill=DelinquentBorrowers))+
+  ggtitle('Loan Origination Year and Loan Amount')
+
+
+
+```
+
+The highest mean of Loan amount is shown in the years 2013 and 2014.MOre delinquencies are shown in 2007, this might be financial crisis year
+
+```{r echo = FALSE}
+ggplot(aes(x = ListingCategory, y = LoanOriginalAmount ), data = required_data)+
+  geom_boxplot(aes(fill = DelinquentBorrowers))+
+  ggtitle('Listing Category and Loan Amount')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  
+
+
+```
+
+Debt Consolidation and Baby adoption has highest mean of Loans.Lets see at which more LoanAmount is Taken
+
+
+```{r echo=FALSE}
+ggplot(aes(x = Term, y = LoanOriginalAmount ), data = required_data)+
+  geom_boxplot(aes(fill = DelinquentBorrowers))+
+  ggtitle('Loan Term and Loan Amount')
+
+```
+
+By obersving the above 3 boxplots for the 3 terms ,surprisingly the 60 month term has highest mean of Loan amount. This is quite surprising because in univariate analysis , the term 36 month plot has around 80k borrowers .This considering our previous plot where only approx. 25k borrowers used 60 month term loans in comparison to approx. 80k borrowers who used 36 month terms
+
+```{r echo=FALSE}
+ggplot(aes(x = LoanOriginalAmount, y = BankcardUtilization ), data = required_data)+
+  geom_point()+
+  ggtitle('Loan amount and Bank Card Utilization')
+
+```
+
+we see a high volume cluster of loans under $10,000 with borrowers close to 100% bankcard utilization.This is quite surprising 
+
+```{r echo=FALSE}
+
+ggplot(aes(x = StatedMonthlyIncome, y = DebtToIncomeRatio), data = required_data)+
+  scale_x_continuous()+
+  geom_point(alpha = 0.05, position = "jitter")+
+  #geom_line()+
+  xlim(0,10000)+
+  geom_smooth(method = "lm",se = FALSE, aes(colour = DelinquentBorrowers))+
+  ggtitle('Debt to income ratio')
+```
+
+The plot suggests a negative correlation between monthly income and debt-to-income ratio
+
+```{r echo=FALSE}
+
+ggplot(aes(x = BorrowerRate, y = DebtToIncomeRatio), data = required_data)+
+  scale_x_continuous()+
+  geom_point(alpha = 0.05, position = "jitter")+
+  geom_smooth(method = "lm",se= FALSE,aes(colour = DelinquentBorrowers))+
+  ggtitle('Interest Rate and Debt to income ratio')
+
+```
+
+
+The relationship between a borrower's interest rate (BorrowerRate) and their debt ratio (DebtToIncomeRatio) was expected to be a positive correlation. I expected borrowers with high debt-to-income ratios would automatically receive higher interest rates on their loans. However, based on the above scatterplot, there seems to be no trend and a weak positive correlation between these two variables
+
+```{r echo=FALSE}
+ggplot(aes(x=BorrowerAPR,y = BorrowerRate),data = required_data)+
+  geom_point(alpha = 0.009)+
+  geom_smooth(method = "lm",se = FALSE,aes(colour = DelinquentBorrowers))+
+  ggtitle('Borrower APR and Borrower Rate')
+
+```
+
+```{r echo=FALSE}
+ggplot(aes(x=CreditScoreRangeLower,y = CreditScoreRangeUpper),data = required_data)+
+  geom_point(aes(colour = DelinquentBorrowers))+
+  ggtitle('Credit Score Range Lower and Credit Score Range Upper')
+
+```
+
+```{r echo=FALSE}
+ggplot(aes(x=LoanOriginalAmount,y = Investors),data = required_data)+
+  geom_point(alpha = 0.05)+
+  geom_smooth(method = "lm",se = FALSE,aes(colour = DelinquentBorrowers))+
+  xlim(0,20000)+
+  ggtitle('Loan Amount and Investors')
+
+```
+
+```{r echo=FALSE}
+
+plot_lower<- ggplot(aes(x= CreditScoreRangeLower,y = Investors),data = required_data)+
+  geom_point(aes(colour = DelinquentBorrowers))+
+  ggtitle('Lower Credit Score and Investors')
+plot_upper<-  ggplot(aes(x= CreditScoreRangeUpper,y = Investors),data = required_data)+
+  geom_point(aes(colour = DelinquentBorrowers))+
+  ggtitle(' Upper Credit Score and Investors')
+
+grid.arrange(plot_lower,plot_upper,ncol = 2)
+
+```
+
+```{r echo=FALSE}
+plot_lower_loan<- ggplot(aes(x= CreditScoreRangeLower,y = LoanOriginalAmount),data = required_data)+
+  geom_point(aes(colour = DelinquentBorrowers))+
+  ggtitle('Lower Credit Score and Loan Amount')
+plot_upper_loan<-  ggplot(aes(x= CreditScoreRangeUpper,y = LoanOriginalAmount),data = required_data)+
+  geom_point(aes(colour = DelinquentBorrowers))+
+  ggtitle(' Upper Credit Score and Loan Amount')
+
+grid.arrange(plot_lower_loan,plot_upper_loan,ncol = 2)
+
+```
+
+
+```{r echo = FALSE}
+plot_lower_b<- ggplot(aes(x= CreditScoreRangeLower,y = BorrowerRate),data = required_data)+
+  geom_boxplot(aes(colour = DelinquentBorrowers))+
+  xlim(400,750)+
+  ggtitle('Lower Credit Score and Interest Rate')
+plot_upper_b<-  ggplot(aes(x= CreditScoreRangeUpper,y = BorrowerRate),data = required_data)+
+  geom_boxplot(aes(colour = DelinquentBorrowers))+
+   xlim(400,750)+
+  ggtitle(' Upper Credit Score and Interest Rate')
+
+grid.arrange(plot_lower_b,plot_upper_b,ncol = 2)
+
+```
+
+
+# Bivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the \
+investigation. How did the feature(s) of interest vary with other features in \
+the dataset?
+
+Credit Score, Loan Amount and Investors have a moderate pOsitive relationship, where as Borrower's interest Rate and Debt to Income Ratio has a 
+
+
+
+### Did you observe any interesting relationships between the other features \
+(not the main feature(s) of interest)?
+
+Negative relationship between monthly income and debt-to-income ratio is interesting
+
+### What was the strongest relationship you found?
+
+Borrower APR and Borrower rate , Credit Range Upper and Credit Range Lower has the strongest relationship 
+
+# Multivariate Plots Section
+
+```{r echo=FALSE, Multivariate_Plots}
+ggcorr(required_data, label = TRUE, label_size = 3,
+       hjust = 0.8, size = 2.5, color = "black", layout.exp = 2)
+
+```
+
+
+```{r echo = FALSE}
+#coef(lm(LoanOriginalAmount ~ Investors, data = required_data))
+
+ggplot(aes(x = LoanOriginalAmount,y = Investors), data = required_data) +
+  xlim(0,10000)+
+  geom_point(alpha = 0.05)+
+  geom_smooth(method = "lm",se = FALSE, aes(colour = DelinquentBorrowers))+
+   facet_wrap(~DelinquentBorrowers)
+
+
+```
+
+
+```{r echo=FALSE}
+ggplot(aes(x = CreditScoreRangeLower,y = CreditScoreRangeUpper,colour = DelinquentBorrowers), data = required_data) +
+  
+  geom_point(aes(fill = DelinquentBorrowers))+
+  facet_wrap(~Term)
+
+```
+
+```{r echo=FALSE}
+ggplot(aes(x = BorrowerRate,y = Investors), data = required_data) +
+    geom_point(alpha = 0.05)+
+  geom_smooth(method = "lm",se = FALSE,aes(colour = DelinquentBorrowers))+
+  facet_wrap(~Term)
+```
+
+Negative Correlation between Borrower rate and Investors
+
+
+```{r echo=FALSE}
+
+ggplot(aes(x = LoanOriginalAmount,y = LoanOriginatedYear,colour = DelinquentBorrowers), data = required_data) +
+  xlim(0,5000)+
+  geom_jitter(alpha = 0.3,aes(fill = DelinquentBorrowers))+
+    facet_wrap(~IncomeRange)
+
+```
+
+```{r echo=FALSE}
+ggplot(aes(x = BorrowerRate,y = CreditScoreRangeLower), data = required_data) +
+  geom_point(alpha = 0.05)+
+  geom_smooth(method = "lm",se = FALSE,aes(colour = DelinquentBorrowers))+
+  facet_wrap(~LoanStatus)
+
+```
+
+```{r echo=FALSE}
+ggplot(aes(x = BorrowerRate,y = CreditScoreRangeUpper), data = required_data) +
+  geom_point(alpha = 0.01)+
+  geom_smooth(method = "lm",se = FALSE, aes(colour = DelinquentBorrowers))+
+  facet_wrap(~LoanStatus)
+```
+
+
+```{r echo=FALSE}
+ggplot(aes(x = BorrowerRate,y = CreditScoreRangeUpper), data = required_data) +
+  geom_jitter(alpha = 0.05)+
+  ylim(500,750)+
+
+  geom_smooth(method = "lm",se = FALSE,aes(colour = DelinquentBorrowers))+
+  facet_wrap(~ListingCategory)
+
+
+```
+
+```{r echo=FALSE}
+mylogit <- glm(DelinquentBorrowers~BorrowerRate+CreditScoreRangeUpper+Investors+LoanOriginalAmount ,data = required_data,family = "binomial")
+
+```
+
+```{r echo=FALSE}
+summary(mylogit)
+
+```
+
+
+
+# Multivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the \
+investigation. Were there features that strengthened each other in terms of \
+looking at your feature(s) of interest?
+out of all the terms, the 36 month term has highest delinquencies and the borrower interest rate is inversely related to Investors
+
+
+### Were there any interesting or surprising interactions between features?
+from the univariate analysis , found that the listing category - Debt Consolidation has highest delinquencies along with Baby adoption . but when plotted against interest rate and Creditscore it seems like 'Not available' listing category has more delinquencies 
+
+### OPTIONAL: Did you create any models with your dataset? Discuss the \
+strengths and limitations of your model.
+
+Yes, I have created a Logistic Regression Model.The Borrower Rate and Investors has hig impact on Delinquency . For a unit change in Borrower rate , the percent of delinquency increases by  a factor of 6.7, similary for a unit increase in Number of Investors, the delinquency increases by a factor of 6.9 respectively
+Credit Score, Loan Amount has a negative impact on Delinquency. For a unit increase in Credit Score, delinquency decreases by a factor of 9.97,Similarly for unit change in loan amount, the delinquency decrease by a factor of 5.9
+
+------
+
+# Final Plots and Summary
+
+
+### Plot One
+```{r echo=FALSE, Plot_One}
+
+ggplot(aes(  x = DelinquentBorrowers),data = required_data,label(x = 'Delinquent Borrowers')) +
+  geom_bar(width = 0.1)+
+  ggtitle('Delinquent Borrowers')
+ 
+```
+ 
+ 
+
+### Description One
+On overall , I would like to see how many delinquent Borrowers are present in the dataset. Comparatively there are very less delinquent borrowers, which is a good sign.Lets see the factors affecting delinquencies in the next plots
+
+### Plot Two
+```{r echo=FALSE, Plot_Two}
+ggplot(aes(x = BorrowerRate,y = Investors,colour = DelinquentBorrowers), data = required_data) +
+    geom_boxplot(aes(fill = DelinquentBorrowers))+
+  ylim(0,750)+
+  ggtitle('Interest Rate ,Investors and Delinquency')+
+  labs(x = 'Interest rate')
+
+```
+
+### Description Two
+From logistic model, we know that increase in borrower rate or Investors will increase the delinquency , combined both items , we observed that delinquencies are mostly happening after borrower Rate of 0.25 and numbers of investors greater than 20 
+
+### Plot Three
+```{r echo=FALSE, Plot_Three}
+ggplot(aes(x = LoanOriginalAmount,y = CreditScoreRangeUpper),labels(x='Loan Amount [USD]'), data = required_data) +
+  xlim(0,10000)+
+  geom_point(alpha = 0.009)+
+  geom_smooth(method = "lm",se = FALSE,aes(colour = DelinquentBorrowers))+
+  ggtitle('Loan Amount,Credit Score and Delinquency')+
+  labs(x = "Loan Amount [USD]")
+ 
+
+```
+
+### Description Three
+
+From Logistic model we know Loan Amount and Credit Score are negative factors for delinquency , when these factors increase , the delinquency decreases
+Combined in the above plot we observe that , most delinquencies happen at credit score around 500 and Loan Amount less than 5000
+
+------
+
+# Reflection
+
+The Prosper Loan  data set contains information on almost 113 thousand Loan accounts across 81 variables from around 2007. I started by understanding the individual variables in the data set, and then I explored interesting questions and leads as I continued to make observations on plots. Eventually, I explored the Delinquent Borrowers across many variables and created a logistic model to predict Delinquencies. 
+
+There was a clear trend between the Borrower Rate and Credit Score Range and delinquent borrowers. I was surprised that Bankcard Utilization did not have a strong positive correlation with Delinquent Borrowers. I struggled in selecting teh 21 variables from 81 variables, I need to deeply study loan terms in order to select main features and supporting features as well.
+
+From the logistic model , i have learnt Borrower Rate and Investors have Strong Positive Correlation with Delinquent Borrowers which made my Investigation simpler and more focused.Similarly Credit Score and Loan Amount had negative relation on delinquency which is quite interesting .From my final plots , I could be able to say that for the credit score around 500 and Loan Amount less than 5000 , there are more delinquent Borrowers .Also Borrower Interest rate greater than 0.25 and Investors greater than 20 have more probability of delinquencies
